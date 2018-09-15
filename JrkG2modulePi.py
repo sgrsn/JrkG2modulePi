@@ -6,7 +6,7 @@ import time
 
 # This is used to represent a null or missing value for some of the Jrk G2's
 # 16-bit input variables.
-rkG2InputNull = 0xFFFF
+JrkG2InputNull = 0xFFFF
 
 # This value is returned by getLastError() if the last communication with the
 # device resulted in an unsuccessful read (e.g. timeout or NACK).
@@ -205,31 +205,17 @@ class JrkG2Serial(object):
 # macOS USB example:  "/dev/cu.usbmodem001234562"
 # Windows example:    "COM6"
 port_name = "/dev/ttyACM0"
- 
-# Choose the baud rate (bits per second).  This does not matter if you are
-# connecting to the Jrk over USB.  If you are connecting via the TX and RX
-# lines, this should match the baud rate in the Jrk's serial settings.
+
 baud_rate = 9600
- 
-# Change this to a number between 0 and 127 that matches the device number of 
-# your Jrk if there are multiple serial devices on the line and you want to
-# use the Pololu Protocol.
 device_number = None
- 
+
 port = serial.Serial(port_name, baud_rate, timeout=0.1, write_timeout=0.1)
- 
 jrk = JrkG2Serial(port, device_number)
  
 feedback = jrk.get_feedback()
 print("Feedback is {}.".format(feedback))
- 
 target = jrk.get_target()
 print("Target is {}.".format(target))
  
 new_target = 2248 if target < 2048 else 1848
 print("Setting target to {}.".format(new_target))
-#jrk.setTarget(new_target)
-#jrk.forceDutyCycle(100)
-#time.sleep(1)
-#print("stop")
-#jrk.stopMotor()
