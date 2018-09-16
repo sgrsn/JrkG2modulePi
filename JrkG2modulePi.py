@@ -1,4 +1,5 @@
 import serial
+from smbus2 import SMBus, i2c_msg
 from enum import IntEnum, Enum
 
 #not needed
@@ -179,52 +180,9 @@ class SettingOffset(Enum):
     SoftCurrentLimitForward             = 0x72,  # uint16_t
     SoftCurrentLimitReverse             = 0x74,  # uint16_t
   
-class JrkG2Serial(object):
+class JrkG2Base():
     
-    def __init__(self, port, device_number=None):
-        self.port = port
-        self.device_number = device_number
-
-    #commandW7(cmd, val) is equivalent to send_command(cmd, val)
-    #commandWs14(cmd, val) is to send_command(cmd, val&0x7f, val>>7)
-    def send_command(self, cmd, *data_bytes):
-        if self.device_number == None:
-            header = [cmd]  # Compact protocol
-        else:
-            header = [0xAA, device_number, cmd & 0x7F]  # Pololu protocol
-        self.port.write(header + list(data_bytes))
-        
-    def send_commandWs14(self, cmd, val):
-        self.send_command(cmd, val&0x7f, val>>7)
-        
-    def serialW7(self, val):
-        self.port.write([val & 0x7F])
-        
-    def sendCommandHeader(self, cmd):
-        if self.device_number == None:
-            self.port.write([cmd])
-        else:
-            self.port.write([0xAA])
-            self.serialW7(_deviceNumber)
-            self.serialW7(cmd)
-            
-    def commandW7(self, cmd, val):
-        self.sendCommandHeader(cmd)
-        self.serialW7(val)
-        _lastError = 0
-        
-    def commandWs14(self, cmd, val):
-        self.sendCommandHeader(cmd)
-        self.serialW7(val)
-        self.serialW7(val >> 7)
-        _lastError = 0
-        
-    def commandQuick(self, cmd):
-        if self.device_number == None:
-            header = [cmd]  # Compact protocol
-        else:
-            header = [0xAA, device_number, cmd & 0x7F]  # Pololu protocol
-        self.port.write(header)
+    # Motor control commands
 
     def setTarget(self, target):
         self.send_command(JrkG2Command.SetTarget | (target & 0x1F), (target >> 5))
@@ -256,21 +214,8 @@ class JrkG2Serial(object):
         
     def stopMotor(self):
         self.commandQuick(JrkG2Command.MotorOff)
-
-    def get_variables(self, offset, length):
-        self.send_command(JrkG2Command.GetVariables, offset, length)
-        result = self.port.read(length)
-        if len(result) != length:
-            self._lastError = JrkG2CommReadError
-            raise RuntimeError("Expected to read {} bytes, got {}."
-            .format(length, len(result)))
-            return [0]
-        self._lastError = 0
-        data = bytearray(result)
-        val = 0
-        for i in range(length):
-            val |= data[i] << i*8
-        return val
+        
+    # Variable reading command
     
     def sign16bits(self, val):
         return -(val & 0b1000000000000000) | (val & 0b111111111111111)
@@ -290,8 +235,6 @@ class JrkG2Serial(object):
     def getIntegral(self):
         val = self.get_variables(VarOffset.Integral, 2)
         return self.sign16bits(val)
-    
-    # now ################################################
     
     def getDutyCycleTarget(self):
         val = self.get_variables(VarOffset.DutyCycleTarget, 2)
@@ -361,22 +304,129 @@ class JrkG2Serial(object):
     
     def getCurrentChoppingConsecutiveCount(self):
         return self.get_variables(VarOffset.CurrentChoppingConsecutiveCount, 1)
+    
+    
+class JrkG2Serial(JrkG2Base):
+    
+    def __init__(self, port, device_number=None):
+        self.port = port
+        self.device_number = device_number
+    
+    def send_command(self, cmd, *data_bytes):
+        if self.device_number == None:
+            header = [cmd]  # Compact protocol
+        else:
+            header = [0xAA, device_number, cmd & 0x7F]  # Pololu protocol
+        self.port.write(header + list(data_bytes))
+        
+    def send_commandWs14(self, cmd, val):
+        self.send_command(cmd, val&0x7f, val>>7)
+        
+    def serialW7(self, val):
+        self.port.write([val & 0x7F])
+        
+    def sendCommandHeader(self, cmd):
+        if self.device_number == None:
+            self.port.write([cmd])
+        else:
+            self.port.write([0xAA])
+            self.serialW7(_deviceNumber)
+            self.serialW7(cmd)
+            
+    def commandW7(self, cmd, val):
+        self.sendCommandHeader(cmd)
+        self.serialW7(val)
+        _lastError = 0
+        
+    def commandWs14(self, cmd, val):
+        self.sendCommandHeader(cmd)
+        self.serialW7(val)
+        self.serialW7(val >> 7)
+        _lastError = 0
+        
+    def commandQuick(self, cmd):
+        if self.device_number == None:
+            header = [cmd]  # Compact protocol
+        else:
+            header = [0xAA, device_number, cmd & 0x7F]  # Pololu protocol
+        self.port.write(header)
+        
+    def get_variables(self, offset, length):
+        self.send_command(JrkG2Command.GetVariables, offset, length)
+        result = self.port.read(length)
+        if len(result) != length:
+            self._lastError = JrkG2CommReadError
+            raise RuntimeError("Expected to read {} bytes, got {}."
+            .format(length, len(result)))
+            return [0]
+        self._lastError = 0
+        data = bytearray(result)
+        val = 0
+        for i in range(length):
+            val |= data[i] << i*8
+        return val
+            
+class JrkG2I2C(JrkG2Base):
+    
+    def __init__(self, bus, device_address = 0x0B):
+        self.bus = bus
+        self.addr = device_address
+        
+    def send_command(self, cmd, *data_bytes):
+        command = [cmd] + list(data_bytes)
+        write = i2c_msg.write(self.addr, command)
+        self.bus.i2c_rdwr(write)
+        
+    def get_variables(self, offset, length):
+        self.bus.write_i2c_block_data(self.addr, 0xE5, [offset])
+        result = []
+        for i in range(length):
+            result += [self.bus.read_byte(self.addr)]
+        self._lastError = 0
+        data = bytearray(result)
+        val = 0
+        for i in range(length):
+            val |= data[i] << i*8
+        return val
+    
+def serialTest():
 
-# you can run "jrk2cmd --cmd-port" to get the right name to use here.
-# Linux USB example:  "/dev/ttyACM0"
-# macOS USB example:  "/dev/cu.usbmodem001234562"
-# Windows example:    "COM6"
-port_name = "/dev/ttyACM0"
+    # you can run "jrk2cmd --cmd-port" to get the right name to use here.
+    # Linux USB example:  "/dev/ttyACM0"
+    # macOS USB example:  "/dev/cu.usbmodem001234562"
+    # Windows example:    "COM6"
+    port_name = "/dev/ttyACM0"
 
-baud_rate = 9600
-device_number = None
+    baud_rate = 9600
+    device_number = None
 
-port = serial.Serial(port_name, baud_rate, timeout=0.1, write_timeout=0.1)
-jrk = JrkG2Serial(port, device_number)
- 
-feedback = jrk.getFeedback()
-print("Feedback is {}.".format(feedback))
-target = jrk.getTarget()
- 
-new_target = 2248 if target < 2048 else 1848
-jrk.setTarget(new_target)
+    port = serial.Serial(port_name, baud_rate, timeout=0.1, write_timeout=0.1)
+    jrk = JrkG2Serial(port, device_number)
+     
+    feedback = jrk.getFeedback()
+    print("Feedback is {}.".format(feedback))
+    target = jrk.getTarget()
+     
+    new_target = 2248 if target < 2048 else 1848
+    jrk.setTarget(new_target)
+    
+def i2cTest():
+    
+    bus = SMBus(1)
+    address = 11
+     
+    jrk = JrkG2I2C(bus, address)
+     
+    feedback = jrk.getFeedback()
+    print("Feedback is {}.".format(feedback))
+     
+    target = jrk.getTarget()
+    print("Target is {}.".format(target))
+     
+    new_target = 2248 if target < 2048 else 1855
+    print("Setting target to {}.".format(new_target))
+    jrk.setTarget(new_target)
+
+if __name__ == '__main__':
+    #serialTest()
+    i2cTest()
