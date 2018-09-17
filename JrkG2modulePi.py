@@ -1,6 +1,6 @@
 import serial
 from smbus2 import SMBus, i2c_msg
-from enum import IntEnum, Enum
+from enum import IntEnum
 import ctypes
 
 #not needed
@@ -47,13 +47,13 @@ class JrkG2Command(IntEnum):
   GetRAMSettings                    = 0xEA,
   GetCurrentChoppingOccurrenceCount = 0xEC,
 
-class JrkG2ForceMode(Enum):
+class JrkG2ForceMode(IntEnum):
 
   none            = 0,
   DutyCycleTarget = 1,
   DutyCycle       = 2,
 
-class JrkG2Reset(Enum):
+class JrkG2Reset(IntEnum):
 
   PowerUp        = 0,
   Brownout       = 1,
@@ -74,7 +74,7 @@ class JrkG2Pin(IntEnum):
   FBA = 6,
   FBT = 7,
 
-class JrkG2OptionsByte3(Enum):
+class JrkG2OptionsByte3(IntEnum):
 
   ResetIntegral = 0,
   CoastWhenOff = 1,
@@ -114,7 +114,7 @@ class VarOffset(IntEnum):
     CurrentChoppingConsecutiveCount = 0x33, # uint8_t
     CurrentChoppingOccurrenceCount  = 0x34, # uint8_t; read with dedicated command
 
-class SettingOffset(Enum):
+class SettingOffset(IntEnum):
     
     OptionsByte1                        = 0x01,  # uint8_t
     OptionsByte2                        = 0x02,  # uint8_t
@@ -218,6 +218,9 @@ class JrkG2Base():
     def stopMotor(self):
         self.commandQuick(JrkG2Command.MotorOff)
         
+        
+        
+        
     # Variable reading command
     
     def sign16bits(self, val):
@@ -308,616 +311,220 @@ class JrkG2Base():
     def getCurrentChoppingConsecutiveCount(self):
         return self.get_variables(VarOffset.CurrentChoppingConsecutiveCount, 1)
     
-    def getCurrentChoppingOccurrenceCount(self)
+    def getCurrentChoppingOccurrenceCount(self):
         return self.get_variables(JrkG2Command.GetCurrentChoppingOccurrenceCount, 1)
+    
+    
+    
     
     # RAM setting command
     
-    def setResetIntegral(bool reset):
-        uint8_t tmp = getRAMSetting8(SettingOffset::OptionsByte3);
-        if (getLastError())  return; 
-        if (reset)
+    def setResetIntegral(self, reset):
+        tmp = self.getRAMSetting8(SettingOffset.OptionsByte3)
+        if (getLastError()):
+            return
+        if (reset):
+          tmp |= 1 << JrkG2OptionsByte3.ResetIntegral
+        else:
+          tmp &= ~(1 << JrkG2OptionsByte3.ResetIntegral)
+        self.setRAMSetting8(SettingOffset.OptionsByte3, tmp)
 
-          tmp |= 1 << (uint8_t)JrkG2OptionsByte3::ResetIntegral;
-
-        else
-
-          tmp &= ~(1 << (uint8_t)JrkG2OptionsByte3::ResetIntegral);
-
-        setRAMSetting8(SettingOffset::OptionsByte3, tmp);
-
-    def getResetIntegral():
-
-        return getRAMSetting8(SettingOffset::OptionsByte3) >> (uint8_t)JrkG2OptionsByte3::ResetIntegral & 1;
+    def getResetIntegral(self):
+        return self.getRAMSetting8(SettingOffset.OptionsByte3) >> JrkG2OptionsByte3.ResetIntegral & 1
     
-    def setCoastWhenOff(bool coast)
+    def setCoastWhenOff(self, coast):
+        tmp = self.getRAMSetting8(SettingOffset.OptionsByte3)
+        if (getLastError()):
+            return
+        if (coast == 1):
+            tmp |= 1 << JrkG2OptionsByte3.CoastWhenOff
+        else:
+            tmp &= ~(1 << JrkG2OptionsByte3.CoastWhenOff)
+        self.setRAMSetting8(SettingOffset.OptionsByte3, tmp)
+  
+    def getCoastWhenOff(self):
+        return self.getRAMSetting8(SettingOffset.OptionsByte3) >> JrkG2OptionsByte3.CoastWhenOff & 1
 
-        uint8_t tmp = getRAMSetting8(SettingOffset::OptionsByte3);
-        if (getLastError())  return; 
-        if (coast):
+    def setProportionalCoefficient(self, multiplier, exponent):
+        self.setPIDCoefficient(SettingOffset.ProportionalMultiplier, multiplier, exponent)
+    
+    def getProportionalMultiplier(self):
+          return self.getRAMSetting16(SettingOffset.ProportionalMultiplier) 
 
-            tmp |= 1 << (uint8_t)JrkG2OptionsByte3::CoastWhenOff;
+    def getProportionalExponent(self):
+        return self.getRAMSetting8(SettingOffset.ProportionalExponent)
+  
+    def setIntegralCoefficient(self, multiplier, exponent):
+        self.setPIDCoefficient(SettingOffset.IntegralMultiplier, multiplier, exponent)
+  
+    def getIntegralMultiplier(self): 
+        return self.getRAMSetting16(SettingOffset.IntegralMultiplier)
 
-        else
+    def getIntegralExponent(self): 
+        return self.getRAMSetting8(SettingOffset.IntegralExponent)
 
-            tmp &= ~(1 << (uint8_t)JrkG2OptionsByte3::CoastWhenOff);
+    def setDerivativeCoefficient(self, multiplier, exponent):
+        self.setPIDCoefficient(SettingOffset.DerivativeMultiplier, multiplier, exponent)
 
-        setRAMSetting8(SettingOffset::OptionsByte3, tmp);
+    def getDerivativeMultiplier(self):
+        return self.getRAMSetting16(SettingOffset.DerivativeMultiplier)
   
+    def getDerivativeExponent(self):
+        return self.getRAMSetting8(SettingOffset.DerivativeExponent)
 
-  /// Gets the "Coast when off" setting from the Jrk's RAM settings.
-  ///
-  /// See also setCoastWhenOff().
-  bool getCoastWhenOff()
+    def setPIDPeriod(self, period):
+        self.setRAMSetting16(SettingOffset.PIDPeriod, period)
   
-    return getRAMSetting8(SettingOffset::OptionsByte3) >>
-      (uint8_t)JrkG2OptionsByte3::CoastWhenOff & 1;
+    def getPIDPeriod(self):
+        return self.getRAMSetting16(SettingOffset.PIDPeriod)
   
+    def setIntegralLimit(self, limit):
+        self.setRAMSetting16(SettingOffset.IntegralLimit, limit)
+  
+    def getIntegralLimit(self):
+        return self.getRAMSetting16(SettingOffset.IntegralLimit)
+  
+    def setMaxDutyCycleWhileFeedbackOutOfRange(self, duty):
+        self.setRAMSetting16(SettingOffset.MaxDutyCycleWhileFeedbackOutOfRange, duty)
 
-  /// Sets the proportional coefficient in the Jrk's RAM settings.
-  ///
-  /// This coefficient is used in the Jrk's PID algorithm.  The coefficient
-  /// takes the form:
-  ///
-  /// multiplier / (2 ^ exponent)
-  ///
-  /// The multiplier can range from 0 to 1023, and the exponent can range
-  /// from 0 to 18.
-  ///
-  /// Example usage:
-  /// ```
-  /// // Set the proportional coefficient to 1.125 (9/(2^3)).
-  /// jrk.setProportionalCoefficient(9, 3);
-  /// ```
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getProportionalMultiplier() and getProportionalExponent(), as
-  /// well as setIntegralCoefficient() and setDerivativeCoefficient().
-  void setProportionalCoefficient(uint16_t multiplier, uint8_t exponent)
+    def getMaxDutyCycleWhileFeedbackOutOfRange(self):
+        return self.getRAMSetting16(SettingOffset.MaxDutyCycleWhileFeedbackOutOfRange)
   
-    setPIDCoefficient(SettingOffset::ProportionalMultiplier, multiplier, exponent);
+    def setMaxAccelerationForward(self, accel):
+        self.setRAMSetting16(SettingOffset.MaxAccelerationForward, accel)
   
+    def getMaxAccelerationForward(self):
+        return self.getRAMSetting16(SettingOffset.MaxAccelerationForward)
+  
+    def setMaxAccelerationReverse(self, accel):
+        self.setRAMSetting16(SettingOffset.MaxAccelerationReverse, accel);
+  
+    def getMaxAccelerationReverse(self):
+        return self.getRAMSetting16(SettingOffset.MaxAccelerationReverse);
+  
+    def setMaxAcceleration(self, accel):
+        self.setRAMSetting16x2(SettingOffset.MaxAccelerationForward, accel, accel);
+  
+    def setMaxDecelerationForward(self, decel):
+        self.setRAMSetting16(SettingOffset.MaxDecelerationForward, decel);
+  
+    def getMaxDecelerationForward(self):
+        return self.getRAMSetting16(SettingOffset.MaxDecelerationForward)
+  
+    def setMaxDecelerationReverse(self, decel):
+        self.setRAMSetting16(SettingOffset.MaxDecelerationReverse, decel)
+  
+    def getMaxDecelerationReverse(self):
+        return self.getRAMSetting16(SettingOffset.MaxDecelerationReverse)
+  
+    def setMaxDeceleration(self, decel):
+        self.setRAMSetting16x2(SettingOffset.MaxDecelerationForward, decel, decel)
+  
+    def setMaxDutyCycleForward(self, duty):
+        self.setRAMSetting16(SettingOffset.MaxDutyCycleForward, duty)
+  
+    def getMaxDutyCycleForward(self):
+        return self.getRAMSetting16(SettingOffset.MaxDutyCycleForward)
+  
+    def setMaxDutyCycleReverse(self, duty):
+        self.setRAMSetting16(SettingOffset.MaxDutyCycleReverse, duty)
+  
+    def getMaxDutyCycleReverse(self):
+        return self.getRAMSetting16(SettingOffset.MaxDutyCycleReverse)
+  
+    def setMaxDutyCycle(self, duty):
+        self.setRAMSetting16x2(SettingOffset.MaxDutyCycleForward, duty, duty)
 
-  /// Gets the multiplier part of the proportional coefficient from the Jrk's
-  /// RAM settings.
-  ///
-  /// See also getProportionalExponent() and setProportionalCoefficient().
-  uint16_t getProportionalMultiplier()
+    def setEncodedHardCurrentLimitForward(self, encoded_limit):
+        self.setRAMSetting16(SettingOffset.EncodedHardCurrentLimitForward, encoded_limit)
   
-    return getRAMSetting16(SettingOffset::ProportionalMultiplier);
+    def getEncodedHardCurrentLimitForward(self):
+        return self.getRAMSetting16(SettingOffset.EncodedHardCurrentLimitForward)
   
+    def setEncodedHardCurrentLimitReverse(self, encoded_limit):
+        self.setRAMSetting16(SettingOffset.EncodedHardCurrentLimitReverse, encoded_limit)
+  
+    def getEncodedHardCurrentLimitReverse(self):
+        return self.getRAMSetting16(SettingOffset.EncodedHardCurrentLimitReverse)
 
-  /// Gets the exponent part of the proportional coefficient from the Jrk's RAM
-  /// settings.
-  ///
-  /// See also getProportionalMultiplier() and setProportionalCoefficient().
-  uint8_t getProportionalExponent()
-  
-    return getRAMSetting8(SettingOffset::ProportionalExponent);
-  
+    def setEncodedHardCurrentLimit(self, encoded_limit):
+        self.setRAMSetting16x2(SettingOffset.EncodedHardCurrentLimitForward, encoded_limit, encoded_limit)
 
-  /// Sets the integral coefficient in the Jrk's RAM settings.
-  ///
-  /// This coefficient is used in the Jrk's PID algorithm.  The coefficient
-  /// takes the form:
-  ///
-  /// multiplier / (2 ^ exponent)
-  ///
-  /// The multiplier can range from 0 to 1023, and the exponent can range
-  /// from 0 to 18.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getIntegralMultiplier() and getIntegralExponent(), as
-  /// well as setProportionalCoefficient() and setDerivativeCoefficient().
-  void setIntegralCoefficient(uint16_t multiplier, uint8_t exponent)
+    def setBrakeDurationForward(self, duration):
+        self.setRAMSetting8(SettingOffset.BrakeDurationForward, duration)
   
-    setPIDCoefficient(SettingOffset::IntegralMultiplier, multiplier, exponent);
+    def getBrakeDurationForward(self):
+        return self.getRAMSetting8(SettingOffset.BrakeDurationForward)
   
+    def setBrakeDurationReverse(self, duration):
+        self.setRAMSetting8(SettingOffset.BrakeDurationReverse, duration)
+  
+    def getBrakeDurationReverse(self):
+        return self.getRAMSetting8(SettingOffset.BrakeDurationReverse)
+  
+    def setBrakeDuration(self, duration):
+        self.setRAMSetting8x2(SettingOffset.BrakeDurationForward, duration, duration)
+  
+    def setSoftCurrentLimitForward(self, current):
+        self.setRAMSetting16(SettingOffset.SoftCurrentLimitForward, current)
+  
+    def getSoftCurrentLimitForward(self):
+        return self.getRAMSetting16(SettingOffset.SoftCurrentLimitForward)
+  
+    def setSoftCurrentLimitReverse(self, current):
+        self.setRAMSetting16(SettingOffset.SoftCurrentLimitReverse, current)
+  
+    def getSoftCurrentLimitReverse(self): 
+        return self.getRAMSetting16(SettingOffset.SoftCurrentLimitReverse)
+  
+    def setSoftCurrentLimit(self, current):
+        self.setRAMSetting16x2(SettingOffset.SoftCurrentLimitForward, current, current)
+        
+        
+    
+    # Low-level settings command
+    
+    #The three below are not used
 
-  /// Gets the multiplier part of the integral coefficient from the Jrk's
-  /// RAM settings.
-  ///
-  /// See also getIntegralExponent() and setIntegralCoefficient().
-  uint16_t getIntegralMultiplier()
-  
-    return getRAMSetting16(SettingOffset::IntegralMultiplier);
-  
+    def getEEPROMSettings(self, offset, length):
+        data = self.segmentRead()
+        
+    def getRAMSettings(self, offset, length):
+        data = self.segmentRead(JrkG2Command.GetRAMSettings, offset, length)
+        return data
+    
+    def setRAMSettings(self, offset, length, *buffer):
+        self.segmentWrite(JrkG2Command.SetRAMSettings, offset, length, buffer)
 
-  /// Gets the exponent part of the integral coefficient from the Jrk's
-  /// RAM settings.
-  ///
-  /// See also getIntegralMultiplier() and setIntegralCoefficient().
-  uint8_t getIntegralExponent()
-  
-    return getRAMSetting8(SettingOffset::IntegralExponent);
-  
+    #used
+        
+    #Setting RAM command
 
-  /// Sets the derivative coefficient in the Jrk's RAM settings.
-  ///
-  /// This coefficient is used in the Jrk's PID algorithm.  The coefficient
-  /// takes the form:
-  ///
-  /// multiplier / (2 ^ exponent)
-  ///
-  /// The multiplier can range from 0 to 1023, and the exponent can range
-  /// from 0 to 18.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getDerivativeMultiplier() and getDerivativeExponent(), as
-  /// well as setProportionalCoefficient() and setIntegralCoefficient().
-  void setDerivativeCoefficient(uint16_t multiplier, uint8_t exponent)
-  
-    setPIDCoefficient(SettingOffset::DerivativeMultiplier, multiplier, exponent);
-  
-
-  /// Gets the multiplier part of the derivative coefficient from the
-  /// Jrk's RAM settings.
-  ///
-  /// See also getDerivativeExponent() and setDerivativeCoefficient().
-  uint16_t getDerivativeMultiplier()
-  
-    return getRAMSetting16(SettingOffset::DerivativeMultiplier);
-  
-
-  /// Gets the exponent part of the derivative coefficient from the
-  /// Jrk's RAM settings.
-  ///
-  /// See also getDerivativeMultiplier() and setDerivativeCoefficient().
-  uint8_t getDerivativeExponent()
-  
-    return getRAMSetting8(SettingOffset::DerivativeExponent);
-  
-
-  /// Sets the PID period in the Jrk's RAM settings.
-  ///
-  /// This is the rate at which the Jrk runs through all of its calculations, in
-  /// milliseconds.  Note that a higher PID period will result in a more slowly
-  /// changing integral and a higher derivative, so the two corresponding PID
-  /// coefficients might need to be adjusted whenever the PID period is changed.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getPIDPeriod().
-  void setPIDPeriod(uint16_t period)
-  
-    setRAMSetting16(SettingOffset::PIDPeriod, period);
-  
-
-  /// Gets the PID period from the Jrk's RAM settings, in milliseconds.
-  ///
-  /// See also setPIDPeriod().
-  uint16_t getPIDPeriod()
-  
-    return getRAMSetting16(SettingOffset::PIDPeriod);
-  
-
-  /// Sets the integral limit in the Jrk's RAM settings.
-  ///
-  /// The PID algorithm prevents the absolute value of the integral variable
-  /// (also known as error sum) from exceeding this limit.  This can help limit
-  /// integral wind-up.  The limit can range from 0 to 32767.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getIntegralLimit().
-  void setIntegralLimit(uint16_t limit)
-  
-    setRAMSetting16(SettingOffset::IntegralLimit, limit);
-  
-
-  /// Gets the integral limit from the Jrk's RAM settings.
-  ///
-  /// See also setIntegralLimit().
-  uint16_t getIntegralLimit()
-  
-    return getRAMSetting16(SettingOffset::IntegralLimit);
-  
-
-  /// Sets the maximum duty cycle while feedback is out of range in the Jrk's
-  /// RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getMaxDutyCycleWhileFeedbackOutOfRange().
-  void setMaxDutyCycleWhileFeedbackOutOfRange(uint16_t duty)
-  
-    setRAMSetting16(SettingOffset::MaxDutyCycleWhileFeedbackOutOfRange, duty);
-  
-
-  /// Gets the maximum duty cycle while feedback is out of range from the Jrk's RAM
-  /// settings.
-  ///
-  /// See also setMaxDutyCycleWhileFeedbackOutOfRange().
-  uint16_t getMaxDutyCycleWhileFeedbackOutOfRange()
-  
-    return getRAMSetting16(SettingOffset::MaxDutyCycleWhileFeedbackOutOfRange);
-  
-
-  /// Sets the maximum acceleration in the forward direction in the
-  /// Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getMaxAccelerationForward(), setMaxAccelerationReverse(),
-  /// setMaxAcceleration(), and setMaxDecelerationForward().
-  void setMaxAccelerationForward(uint16_t accel)
-  
-    setRAMSetting16(SettingOffset::MaxAccelerationForward, accel);
-  
-
-  /// Gets the maximum acceleration in the forward direction from the
-  /// Jrk's RAM settings.
-  ///
-  /// See also setMaxAccelerationForward().
-  uint16_t getMaxAccelerationForward()
-  
-    return getRAMSetting16(SettingOffset::MaxAccelerationForward);
-  
-
-  /// Sets the maximum acceleration in the reverse direction in the
-  /// Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getMaxAccelerationReverse(), setMaxAccelerationForward(),
-  /// setMaxAcceleration(), and setMaxDecelerationReverse().
-  void setMaxAccelerationReverse(uint16_t accel)
-  
-    setRAMSetting16(SettingOffset::MaxAccelerationReverse, accel);
-  
-
-  /// Gets the maximum acceleration in the reverse direction from the
-  /// Jrk's RAM settings.
-  ///
-  /// See also setMaxAccelerationReverse().
-  uint16_t getMaxAccelerationReverse()
-  
-    return getRAMSetting16(SettingOffset::MaxAccelerationReverse);
-  
-
-  /// Sets the maximum acceleration in both directions in the
-  /// Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also setMaxAccelerationForward(), setMaxAccelerationReverse(),
-  /// setMaxDeceleration().
-  void setMaxAcceleration(uint16_t accel)
-  
-    setRAMSetting16x2(SettingOffset::MaxAccelerationForward, accel, accel);
-  
-
-  /// Sets the maximum deceleration in the forward direction in the Jrk's RAM
-  /// settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getMaxDecelerationForward(), setMaxDecelerationReverse(),
-  /// setMaxDeceleration(), and setMaxAccelerationForward().
-  void setMaxDecelerationForward(uint16_t decel)
-  
-    setRAMSetting16(SettingOffset::MaxDecelerationForward, decel);
-  
-
-  /// Gets the maximum deceleration in the forward direction from the Jrk's RAM
-  /// settings.
-  ///
-  /// See also setMaxDecelerationForward().
-  uint16_t getMaxDecelerationForward()
-  
-    return getRAMSetting16(SettingOffset::MaxDecelerationForward);
-  
-
-  /// Sets the maximum deceleration in the reverse direction in the
-  /// Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getMaxDecelerationReverse(), setMaxDecelerationForward(),
-  /// setMaxDeceleration(), and setMaxAccelerationReverse().
-  void setMaxDecelerationReverse(uint16_t decel)
-  
-    setRAMSetting16(SettingOffset::MaxDecelerationReverse, decel);
-  
-
-  /// Gets the maximum deceleration in the reverse direction from the Jrk's RAM
-  /// settings.
-  ///
-  /// See also setMaxDecelerationReverse().
-  uint16_t getMaxDecelerationReverse()
-  
-    return getRAMSetting16(SettingOffset::MaxDecelerationReverse);
-  
-
-  /// Sets the maximum deceleration in both directions in the
-  /// Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also setMaxDecelerationForward(), setMaxDecelerationReverse(),
-  /// setMaxAcceleration().
-  void setMaxDeceleration(uint16_t decel)
-  
-    setRAMSetting16x2(SettingOffset::MaxDecelerationForward, decel, decel);
-  
-
-  /// Sets the maximum duty cycle in the forward direction in the
-  /// Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getMaxDutyCycleForward(), setMaxDutyCycleReverse().
-  void setMaxDutyCycleForward(uint16_t duty)
-  
-    setRAMSetting16(SettingOffset::MaxDutyCycleForward, duty);
-  
-
-  /// Gets the maximum duty cycle in the forward direction from the Jrk's RAM
-  /// settings.
-  ///
-  /// See also setMaxDutyCycleForward().
-  uint16_t getMaxDutyCycleForward()
-  
-    return getRAMSetting16(SettingOffset::MaxDutyCycleForward);
-  
-
-  /// Sets the maximum duty cycle in the reverse direction in the
-  /// Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getMaxDutyCycleReverse(), setMaxDutyCycleForard().
-  void setMaxDutyCycleReverse(uint16_t duty)
-  
-    setRAMSetting16(SettingOffset::MaxDutyCycleReverse, duty);
-  
-
-  /// Gets the maximum duty cycle in the reverse direction from the
-  /// Jrk's RAM settings.
-  ///
-  /// See also setMaxDutyCycleReverse().
-  uint16_t getMaxDutyCycleReverse()
-  
-    return getRAMSetting16(SettingOffset::MaxDutyCycleReverse);
-  
-
-  /// Sets the maximum duty cycle for both directions in the
-  /// Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also setMaxDutyCycleForward(), setMaxDutyCycleReverse().
-  void setMaxDutyCycle(uint16_t duty)
-  
-    setRAMSetting16x2(SettingOffset::MaxDutyCycleForward, duty, duty);
-  
-
-  /// Sets the encoded hard current limit for driving in the forward direction
-  /// in the Jrk's RAM settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// This command is only valid for the Jrk G2 18v19, 24v13, 18v27, and 24v21.
-  /// The Jrk G2 21v3 does not have a configurable hard current limit.
-  ///
-  /// See also getEncodedHardCurrentLimitForward() and
-  /// setEncodedHardCurrentLimitReverse().
-  void setEncodedHardCurrentLimitForward(uint16_t encoded_limit)
-  
-    setRAMSetting16(SettingOffset::EncodedHardCurrentLimitForward,
-      encoded_limit);
-  
-
-  /// Gets the encoded hard current limit for driving in the forward direction
-  /// from the Jrk's RAM settings.
-  ///
-  /// This command is only valid for the Jrk G2 18v19, 24v13, 18v27, and 24v21.
-  /// The Jrk G2 21v3 does not have a configurable hard current limit.
-  ///
-  /// See also setEncodedHardCurrentLimitForward().
-  uint16_t getEncodedHardCurrentLimitForward()
-  
-    return getRAMSetting16(SettingOffset::EncodedHardCurrentLimitForward);
-  
-
-  /// Sets the encoded hard current limit for driving in the reverse direction
-  /// in the Jrk's RAM settings
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// This command is only valid for the Jrk G2 18v19, 24v13, 18v27, and 24v21.
-  /// The Jrk G2 21v3 does not have a configurable hard current limit.
-  ///
-  /// See also getEncodedHardCurrentLimitReverse() and
-  /// setEncodedHardCurrentLimitForward().
-  void setEncodedHardCurrentLimitReverse(uint16_t encoded_limit)
-  
-    setRAMSetting16(SettingOffset::EncodedHardCurrentLimitReverse, encoded_limit);
-  
-
-  /// Gets the encoded hard current limit for driving in the reverse direction
-  /// from the Jrk's RAM settings.
-  ///
-  /// This command is only valid for the Jrk G2 18v19, 24v13, 18v27, and 24v21.
-  /// The Jrk G2 21v3 does not have a configurable hard current limit.
-  ///
-  /// See also setEncodedHardCurrentLimitReverse().
-  uint16_t getEncodedHardCurrentLimitReverse()
-  
-    return getRAMSetting16(SettingOffset::EncodedHardCurrentLimitReverse);
-  
-
-  /// Sets the encoded hard current limit for both directions in the Jrk's RAM
-  /// settings.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// This command is only valid for the Jrk G2 18v19, 24v13, 18v27, and 24v21.
-  /// The Jrk G2 21v3 does not have a configurable hard current limit.
-  ///
-  /// See also setEncodedHardCurrentLimitForward(),
-  /// setEncodedHardCurrentLimitReverse(), getEncodedHardCurrentLimit(), and
-  /// setSoftCurrentLimit().
-  void setEncodedHardCurrentLimit(uint16_t encoded_limit)
-  
-    setRAMSetting16x2(SettingOffset::EncodedHardCurrentLimitForward,
-      encoded_limit, encoded_limit);
-  
-
-  /// Sets the brake duration when switching from forward to reverse in the
-  /// Jrk's RAM settings, in units of 5 ms.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getBrakeDurationForward() and setBrakeDurationReverse().
-  void setBrakeDurationForward(uint8_t duration)
-  
-    setRAMSetting8(SettingOffset::BrakeDurationForward, duration);
-  
-
-  /// Gets the brake duration when switching from forward to reverse from the
-  /// Jrk's RAM settings, in units of 5 ms.
-  ///
-  /// See also setBrakeDurationForward().
-  uint8_t getBrakeDurationForward()
-  
-    return getRAMSetting8(SettingOffset::BrakeDurationForward);
-  
-
-  /// Sets the brake duration when switching from reverse to forward in the
-  /// Jrk's RAM settings, in units of 5 ms.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getBrakeDurationReverse() and setBrakeDurationForward().
-  void setBrakeDurationReverse(uint8_t duration)
-  
-    setRAMSetting8(SettingOffset::BrakeDurationReverse, duration);
-  
-
-  /// Gets the brake duration when switching from reverse to forward from the
-  /// Jrk's RAM settings, in units of 5 ms.
-  ///
-  /// See also setBrakeDurationReverse().
-  uint8_t getBrakeDurationReverse()
-  
-    return getRAMSetting8(SettingOffset::BrakeDurationReverse);
-  
-
-  /// Sets the brake duration for both directions in the Jrk's RAM settings, in
-  /// units of 5 ms.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also setBrakeDurationForward(), setBrakeDurationReverse().
-  void setBrakeDuration(uint8_t duration)
-  
-    setRAMSetting8x2(SettingOffset::BrakeDurationForward, duration, duration);
-  
-
-  /// Sets the soft current limit when driving in the forward direction in the
-  /// Jrk's RAM settings, in units of mA.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getSoftCurrentLimitForward() and setSoftCurrentLimitReverse().
-  void setSoftCurrentLimitForward(uint16_t current)
-  
-    setRAMSetting16(SettingOffset::SoftCurrentLimitForward, current);
-  
-
-  /// Gets the soft current limit when driving in the forward direction from the
-  /// Jrk's RAM settings, in units of mA.
-  ///
-  /// See also setSoftCurrentLimitForward().
-  uint16_t getSoftCurrentLimitForward()
-  
-    return getRAMSetting16(SettingOffset::SoftCurrentLimitForward);
-  
-
-  /// Sets the soft current limit when driving in the reverse direction in the
-  /// Jrk's RAM settings, in units of mA.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also getSoftCurrentLimitReverse() and setSoftCurrentLimitForward().
-  void setSoftCurrentLimitReverse(uint16_t current)
-  
-    setRAMSetting16(SettingOffset::SoftCurrentLimitReverse, current);
-  
-
-  /// Gets the soft current limit when driving in the reverse direction from the
-  /// Jrk's RAM settings, in units of mA.
-  ///
-  /// See also setSoftCurrentLimitReverse().
-  uint16_t getSoftCurrentLimitReverse()
-  
-    return getRAMSetting16(SettingOffset::SoftCurrentLimitReverse);
-  
-
-  /// Sets the soft current limit for driving in both directions in the Jrk's
-  /// RAM settings, in units of mA.
-  ///
-  /// You would normally configure this setting ahead of time using the Jrk G2
-  /// Configuration Utility, but this function allows you to change it
-  /// temporarily on the fly.
-  ///
-  /// See also setSoftCurrentLimitForward() and setSoftCurrentLimitReverse(),
-  /// setEncodedHardCurrentLimit().
-  void setSoftCurrentLimit(uint16_t current)
-  
-    setRAMSetting16x2(SettingOffset::SoftCurrentLimitForward, current, current);
-  
-
+    def setRAMSetting8(self, offset, val):
+        self.segmentWrite(JrkG2Command.SetRAMSettings, offset, 1, val)
+        
+    def setRAMSetting16(self, offset, val):
+        self.segmentWrite(JrkG2Command.SetRAMSettings, offset, 2, val&0xFF, val>>8)
+        
+    def setRAMSetting8x2(self, offset, val1, val2):
+        self.segmentWrite(JrkG2Command.SetRAMSettings, offset, 2, val1, val2)
+        
+    def setRAMSetting16x2(self, offset, val1, val2):
+        self.segmentWrite(JrkG2Command.SetRAMSettings, offset, 4, val1&0xFF, val1>>8, val2&0xFF, val2>>8)
+        
+    
+    #Getting RAM command
+        
+    def setPIDCoefficient(self, offset, multiplier, exponent):
+        #to do
+        pass
+    
+    def getRAMSetting8(self, offset):
+        return self.segmentRead(JrkG2Command.GetRAMSettings, offset, 1)
+    
+    def getRAMSetting16(self, offset):
+        data = self.segmentRead(JrkG2Command.GetRAMSettings, offset, 2)
+        return data[0] + 256*data[1]
     
 class JrkG2Serial(JrkG2Base):
     
@@ -968,7 +575,31 @@ class JrkG2Serial(JrkG2Base):
         for i in range(length):
             val |= data[i] << i*8
         return val
-
+    
+    def segmentWrite(self, cmd, offset, length, *buffer):
+        if length > 7:
+            length = 7
+        self.sendCommandHeader(cmd)
+        self.serialW7(int(offset))
+        self.serialW7(length)
+        data = list(buffer)
+        msbs = 0
+        for i in range(length):
+            self.serialW7(data[i])
+            msbs |= (data[i] >> 7 & 1) << i
+        self.serialW7(msbs)
+        
+    def segmentRead(self, cmd, offset, length):
+        if length > 15:
+            length = 15
+        self.send_command(cmd, offset, length)
+        result = self.port.read(length)
+        if len(result) != length:
+            self._lastError = JrkG2CommReadError
+            return [0]
+        self._lastError = 0
+        data = bytearray(result)
+        return data
 
 class JrkG2I2C(JrkG2Base):
     
@@ -1002,7 +633,6 @@ class JrkG2I2C(JrkG2Base):
         return val
     
 def serialTest():
-
     # you can run "jrk2cmd --cmd-port" to get the right name to use here.
     # Linux USB example:  "/dev/ttyACM0"
     # macOS USB example:  "/dev/cu.usbmodem001234562"
@@ -1016,12 +646,23 @@ def serialTest():
     jrk = JrkG2Serial(port, device_number)
      
     feedback = jrk.getFeedback()
-    print("Feedback is .".format(feedback))
+    print(feedback)
     target = jrk.getTarget()
+    print(target)
      
     new_target = 2248 if target < 2048 else 1848
-    #jrk.setTarget(new_target)
-    #jrk.forceDutyCycleTarget(600)
+    jrk.setTarget(new_target)
+
+    
+def serialRAMtest():
+    port_name = "/dev/ttyACM0"
+    baud_rate = 9600
+    device_number = None
+    port = serial.Serial(port_name, baud_rate, timeout=0.1, write_timeout=0.1)
+    period = jrk.getPIDPeriod()
+    jrk.setPIDPeriod(10)
+    period = jrk.getPIDPeriod()
+    print(period)
     
 def i2cTest():
     
@@ -1045,4 +686,5 @@ def i2cTest():
 
 if __name__ == '__main__':
     #serialTest()
-    i2cTest()
+    #i2cTest()
+    serialRAMtest()
