@@ -632,6 +632,22 @@ class JrkG2I2C(JrkG2Base):
             val |= data[i] << i*8
         return val
     
+    def segmentWrite(self, cmd, offset, length, *buffer):
+        if(length > 13):
+            length = 13
+        self.bus.write_i2c_block_data(self.addr, cmd, [offset, length] + list(buffer))
+        
+    def segmentRead(self, cmd, offset, length):
+        if length > 15:
+            length = 15
+        self.bus.write_i2c_block_data(self.addr, cmd, [offset])
+        result = []
+        for i in range(length):
+            result += [self.bus.read_byte(self.addr)]
+        self._lastError = 0
+        return bytearray(result)
+        
+    
 def serialTest():
     # you can run "jrk2cmd --cmd-port" to get the right name to use here.
     # Linux USB example:  "/dev/ttyACM0"
@@ -659,6 +675,7 @@ def serialRAMtest():
     baud_rate = 9600
     device_number = None
     port = serial.Serial(port_name, baud_rate, timeout=0.1, write_timeout=0.1)
+    jrk = JrkG2Serial(port, device_number)
     period = jrk.getPIDPeriod()
     jrk.setPIDPeriod(10)
     period = jrk.getPIDPeriod()
@@ -672,19 +689,31 @@ def i2cTest():
     jrk = JrkG2I2C(bus, address)
      
     feedback = jrk.getFeedback()
-    print("Feedback is .".format(feedback))
+    print(feedback)
      
     target = jrk.getTarget()
-    print("Target is .".format(target))
+    print(target)
      
     new_target = 2248 if target < 2048 else 1855
-    print("Setting target to .".format(new_target))
-    #jrk.setTarget(new_target)
-    jrk.forceDutyCycleTarget(600)
-    time.sleep(1)
-    jrk.stopMotor()
+    print(new_target)
+    jrk.setTarget(new_target)
+    #jrk.forceDutyCycleTarget(600)
+    #time.sleep(1)
+    #jrk.stopMotor()
+    
+def i2cRAMtest():
+    
+    bus = SMBus(1)
+    address = 11
+    jrk = JrkG2I2C(bus, address)
+    period = jrk.getPIDPeriod()
+    print(period)
+    jrk.setPIDPeriod(10)
+    period = jrk.getPIDPeriod()
+    print(period)
 
 if __name__ == '__main__':
     #serialTest()
     #i2cTest()
-    serialRAMtest()
+    #serialRAMtest()
+    i2cRAMtest()
