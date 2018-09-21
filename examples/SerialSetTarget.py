@@ -4,6 +4,7 @@ import ctypes
 from JrkG2modulePi import JrkG2
 
 # you can run "jrk2cmd --cmd-port" to get the right name to use here.
+# コマンド"jrk2cmd --cmd-port"を実行することでポート名を確認できます。
 # Linux USB example:  "/dev/ttyACM0"
 # macOS USB example:  "/dev/cu.usbmodem001234562"
 # Windows example:    "COM6"
