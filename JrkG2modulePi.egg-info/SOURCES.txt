@@ -1,0 +1,8 @@
+setup.py
+JrkG2modulePi/JrkG2.py
+JrkG2modulePi/__init__.py
+JrkG2modulePi.egg-info/PKG-INFO
+JrkG2modulePi.egg-info/SOURCES.txt
+JrkG2modulePi.egg-info/dependency_links.txt
+JrkG2modulePi.egg-info/requires.txt
+JrkG2modulePi.egg-info/top_level.txt

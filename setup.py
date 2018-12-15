@@ -18,7 +18,7 @@ setup(
     keywords = ['Jrk', 'JrkG2', 'Pololu', 'Suzakulab'],
     license = 'MIT License',
     install_requires = [
-        'pyserial'
+        'pyserial',
         'smbus2',
         'enum34'
         ]

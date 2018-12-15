@@ -1,0 +1,13 @@
+Metadata-Version: 1.1
+Name: JrkG2modulePi
+Version: 1.0.8
+Summary: The JrkG2 library for Linux, RaspberryPi.
+Home-page: https://github.com/sgrsn/JrkG2modulePi
+Author: UNKNOWN
+Author-email: UNKNOWN
+License: MIT License
+Description: UNKNOWN
+Keywords: Jrk,JrkG2,Pololu,Suzakulab
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 2.7
