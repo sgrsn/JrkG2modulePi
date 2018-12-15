@@ -315,8 +315,6 @@ class JrkG2Base():
         return self.get_variables(JrkG2Command.GetCurrentChoppingOccurrenceCount, 1)
     
     
-    
-    
     # RAM setting command
     
     def setResetIntegral(self, reset):
@@ -345,7 +343,8 @@ class JrkG2Base():
     def getCoastWhenOff(self):
         return self.getRAMSetting8(SettingOffset.OptionsByte3) >> JrkG2OptionsByte3.CoastWhenOff & 1
 
-    def setProportionalCoefficient(self, multiplier, exponent):
+    def setProportionalCoefficient(self, coefficient):
+        multiplier, exponent = self.calcValueFromCoefficient(coefficient)
         self.setPIDCoefficient(SettingOffset.ProportionalMultiplier, multiplier, exponent)
     
     def getProportionalMultiplier(self):
@@ -354,7 +353,8 @@ class JrkG2Base():
     def getProportionalExponent(self):
         return self.getRAMSetting8(SettingOffset.ProportionalExponent)
   
-    def setIntegralCoefficient(self, multiplier, exponent):
+    def setIntegralCoefficient(self, coefficient):
+        multiplier, exponent = self.calcValueFromCoefficient(coefficient)
         self.setPIDCoefficient(SettingOffset.IntegralMultiplier, multiplier, exponent)
   
     def getIntegralMultiplier(self): 
@@ -363,7 +363,8 @@ class JrkG2Base():
     def getIntegralExponent(self): 
         return self.getRAMSetting8(SettingOffset.IntegralExponent)
 
-    def setDerivativeCoefficient(self, multiplier, exponent):
+    def setDerivativeCoefficient(self, coefficient):
+        multiplier, exponent = self.calcValueFromCoefficient(coefficient)
         self.setPIDCoefficient(SettingOffset.DerivativeMultiplier, multiplier, exponent)
 
     def getDerivativeMultiplier(self):
@@ -479,8 +480,32 @@ class JrkG2Base():
   
     def setSoftCurrentLimit(self, current):
         self.setRAMSetting16x2(SettingOffset.SoftCurrentLimitForward, current, current)
-        
-        
+
+    # Function to calculate multiplier and exponent from PID coefficient.
+    # On Jrk, it is calculated as follows.
+    # coefficient = multiplier / 2^exponent
+    # And The limit of each value is 1023(multiplier), 18(exponent).
+    def calcValueFromCoefficient(self, coefficient):
+        multiplier = 0
+        exponent = 0
+        error = 0
+        error_min = 1000
+        tmp = coefficient
+        i = 0
+        while i <= 18:
+            e = i
+            m = int(coefficient*(2**e)+0.5)
+            _coefficient = float(m)/(2.0**e)
+            error = abs(coefficient - _coefficient)
+            if error < error_min:
+                error_min = error
+                multiplier = m
+                exponent = e
+            tmp *= 2
+            if tmp > 1023:
+                break
+            i+=1
+        return multiplier, exponent
     
     # Low-level settings command
     
@@ -512,12 +537,10 @@ class JrkG2Base():
     def setRAMSetting16x2(self, offset, val1, val2):
         self.segmentWrite(JrkG2Command.SetRAMSettings, offset, 4, val1&0xFF, val1>>8, val2&0xFF, val2>>8)
         
+    def setPIDCoefficient(self, offset, multiplier, exponent):
+        self.segmentWrite(JrkG2Command.SetRAMSettings, offset, 3, multiplier, (multiplier >> 8) & 0xFF, exponent)
     
     #Getting RAM command
-        
-    def setPIDCoefficient(self, offset, multiplier, exponent):
-        #to do
-        pass
     
     def getRAMSetting8(self, offset):
         return self.segmentRead(JrkG2Command.GetRAMSettings, offset, 1)
@@ -676,10 +699,7 @@ def serialRAMtest():
     device_number = None
     port = serial.Serial(port_name, baud_rate, timeout=0.1, write_timeout=0.1)
     jrk = JrkG2Serial(port, device_number)
-    period = jrk.getPIDPeriod()
-    jrk.setPIDPeriod(10)
-    period = jrk.getPIDPeriod()
-    print(period)
+    jrk.setProportionalCoefficient(1.0)
     
 def i2cTest():
     
@@ -715,5 +735,5 @@ def i2cRAMtest():
 if __name__ == '__main__':
     #serialTest()
     #i2cTest()
-    #serialRAMtest()
-    i2cRAMtest()
+    serialRAMtest()
+    #i2cRAMtest()
