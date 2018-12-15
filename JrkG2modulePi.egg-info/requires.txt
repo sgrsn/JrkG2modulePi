@@ -1,2 +1,0 @@
-pyserialsmbus2
-enum34
