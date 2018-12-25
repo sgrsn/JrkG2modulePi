@@ -4,7 +4,7 @@ __auther__ = 'Hidaka Sato'
 
 setup(
     name = 'JrkG2modulePi',
-    version = '1.0.9',
+    version = '1.1.0',
     description = 'The Jrk G2 library for Linux, RaspberryPi.',
     auther = 'Hidaka Sato',
     auther_email = 'sato@suzakugiken.jp',
