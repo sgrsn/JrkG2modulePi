@@ -7,7 +7,6 @@ setup(
     version = '1.1.0',
     description = 'The Jrk G2 library for Linux, RaspberryPi.',
     auther = 'Hidaka Sato',
-    auther_email = 'sato@suzakugiken.jp',
     url = 'https://github.com/sgrsn/JrkG2modulePi',
     classifiers = [
         'License :: OSI Approved :: MIT License',
@@ -15,7 +14,7 @@ setup(
         ],
     packages = find_packages(),
     include_package_data = True,
-    keywords = ['Jrk', 'JrkG2', 'Pololu', 'Suzakulab'],
+    keywords = ['Jrk', 'Jrk G2', 'Pololu'],
     license = 'MIT License',
     install_requires = [
         'pyserial',
